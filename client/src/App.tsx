@@ -40,7 +40,7 @@ function App() {
         </section>
 
         {/* URL Input and Coupon Codes Container */}
-        <section className="max-w-2xl mx-auto bg-[#141414] border border-[#262626] rounded p-6">
+        <section className="max-w-2xl mx-auto bg-[#0f0f0f] border border-[#262626] rounded p-6">
           {/* URL Form */}
           <form onSubmit={handleSubmit} className="flex flex-row items-center gap-4">
             {/* Hidden label for accessibility */}
@@ -54,7 +54,7 @@ function App() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               style={{ fontFamily: 'ApercuRegular, sans-serif' }}
-              className="h-10 flex-grow p-2 bg-[#1d1d1d] border border-[#262626] rounded focus:outline-none hover:border-[#262626]"
+              className="h-10 flex-grow p-2 bg-[#141414] border border-[#262626] rounded focus:outline-none hover:border-[#262626]"
             />
             <button
               type="submit"
@@ -73,7 +73,7 @@ function App() {
                   <button
                     key={idx}
                     onClick={() => handleCopyCode(code)}
-                    className="group relative bg-[#1d1d1d] border border-[#262626] rounded p-6 text-center cursor-pointer"
+                    className="group relative bg-[#141414] border border-[#262626] rounded p-6 text-center cursor-pointer"
                   >
                     <h1 className="text-xl tracking-wider">{code}</h1>
 
