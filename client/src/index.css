@@ -10,9 +10,20 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: 'WindsorBold';
+  src: url('/public/fonts/WindsorBold/WindsorBold.woff2') format('woff2'),
+       url('/public/fonts/WindsorBold/WindsorBold.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 body {
   font-family: 'ApercuRegular', sans-serif;
+}
+h1, h2, h3 {
+  font-family: 'WindsorBold', serif;
 }
 
 code {

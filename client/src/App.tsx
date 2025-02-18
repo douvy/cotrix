@@ -27,16 +27,16 @@ function App() {
     <div className="flex flex-col min-h-screen bg-[#0f0f0f] text-white">
       {/* Header (minimal) */}
       <header className="bg-[#141414] border-b border-[#262626] px-6 py-4">
-        <h1 className="text-xl font-bold tracking-wide">Cotrix</h1>
+        <h1 className="text-xl font-bold tracking-wider">Cotrix</h1>
       </header>
 
       {/* Main Content */}
       <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
         {/* Basic Description */}
         <section className="mb-8 text-center">
-          <p className="text-gray-400">
-            Enter a store URL to get the top 3 coupon codes instantly
-          </p>
+          <h3 className="text-[#999] tracking-wider text-2xl">
+            Enter a store URL to get the top 3 coupon codes
+          </h3>
         </section>
 
         {/* URL Input and Coupon Codes Container */}
@@ -53,6 +53,7 @@ function App() {
               placeholder="https://www.example.com"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              style={{ fontFamily: 'ApercuRegular, sans-serif' }}
               className="h-10 flex-grow p-2 bg-[#1d1d1d] border border-[#262626] rounded focus:outline-none hover:border-[#262626]"
             />
             <button
@@ -66,7 +67,7 @@ function App() {
           {/* Coupon Codes Display */}
           {codes.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold mb-4">Best Coupon Codes Found</h2>
+              <h2 className="text-lg mb-4 tracking-wider">Best Coupon Codes Found</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {codes.map((code, idx) => (
                   <button
@@ -74,11 +75,11 @@ function App() {
                     onClick={() => handleCopyCode(code)}
                     className="group relative bg-[#1d1d1d] border border-[#262626] rounded p-6 text-center cursor-pointer"
                   >
-                    <p className="text-xl font-bold">{code}</p>
+                    <h1 className="text-xl tracking-wider">{code}</h1>
 
                     {/* Hover indicator when not copied */}
                     {copiedCode !== code && (
-                      <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity delay-100">
+                      <div className="absolute top-1 right-1 flex items-center gap-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity delay-100">
                         <svg
                           width="14"
                           height="14"
@@ -94,13 +95,13 @@ function App() {
                             fill="currentColor"
                           />
                         </svg>
-                        <span>copy</span>
+                        <span>Copy</span>
                       </div>
                     )}
 
                     {/* Copied indicator when this code is copied */}
                     {copiedCode === code && (
-                      <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-white">
+                      <div className="absolute top-1 right-1 flex items-center gap-1 text-xs text-white">
                         <svg
                           aria-label="Verified"
                           width="18"
@@ -125,7 +126,7 @@ function App() {
                             fill="#ffffff"
                           />
                         </svg>
-                        <span className="text-xs">copied</span>
+                        <span className="text-xs">Copied</span>
                       </div>
                     )}
                   </button>
