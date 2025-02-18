@@ -24,9 +24,9 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0f0f0f] text-white">
+    <div className="flex flex-col min-h-screen bg-[#000] text-white">
       {/* Header (minimal) */}
-      <header className="bg-[#0f0f0f] border-b border-[#262626] px-6 py-4">
+      <header className="bg-[#010101] border-b border-[#262626] px-6 py-4">
         <h1 className="text-2xl font-bold tracking-wider text-white">Cotrix</h1>
       </header>
 
@@ -138,7 +138,7 @@ function App() {
       </main>
 
       {/* Sticky Footer */}
-      <footer className="mt-auto bg-[#141414] border-t border-[#262626] py-4 text-center text-[#999999] text-sm">
+      <footer className="mt-auto bg-[#010101] border-t border-[#262626] py-4 text-center text-[#A1A1A1] text-sm">
         &copy; {new Date().getFullYear()} Cotrix. All rights reserved.
       </footer>
     </div>
