@@ -173,7 +173,7 @@ function App() {
       </main>
 
       <footer className="mt-auto bg-[#010101] border-t border-[#262626] py-4 text-center text-[#A1A1A1] text-sm">
-        © 2024 Cotrix. All rights reserved.
+        © 2025 Cotrix. All rights reserved.
       </footer>
     </div>
   );
