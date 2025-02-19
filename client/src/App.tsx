@@ -110,7 +110,7 @@ function App() {
 
           {!loading && codes.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg mb-4 tracking-wider">Best Coupon Codes Found</h2>
+              <h2 className="text-lg mb-4 tracking-wider">Best coupon code(s) found</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {codes.map((code, idx) => (
                   <button
