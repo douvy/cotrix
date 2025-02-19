@@ -1,322 +1,222 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
-import axios from 'axios';
-import cheerio from 'cheerio';
+import * as puppeteer from 'puppeteer';
 
 const app = express();
-
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
-  methods: ['GET', 'POST'],
-  credentials: true
-}));
-
+app.use(cors());
 app.use(express.json());
 
-interface CacheEntry {
-  data: string[];
-  timestamp: number;
-}
+const PORT = 3001;
 
-interface CouponCode {
+interface CouponData {
   code: string;
-  description?: string;
-  verified?: boolean;
-  lastVerified?: string;
-  source: string;
+  description: string;
+  expiry?: string;
 }
 
-const cache = new Map<string, CacheEntry>();
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
+async function initializeBrowser(): Promise<puppeteer.Browser> {
+  return await puppeteer.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu'
+    ]
+  });
+}
 
-const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Referer': 'https://www.google.com/',
-  'DNT': '1',
-  'Connection': 'keep-alive',
-  'Upgrade-Insecure-Requests': '1',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'cross-site',
-  'Sec-Fetch-User': '?1',
-  'Cache-Control': 'max-age=0'
-};
-
-app.post('/api/coupons', async (req: Request, res: Response) => {
-  try {
-    console.log('Received request:', req.body);
-    
-    const { url } = req.body;
-    
-    if (!url || !isValidUrl(url)) {
-      console.log('Invalid URL received:', url);
-      return res.status(400).json({ error: 'Please enter a valid URL' });
-    }
-
-    const cachedResult = getCachedResult(url);
-    if (cachedResult) {
-      console.log('Returning cached result for:', url);
-      return res.json(cachedResult);
-    }
-
-    const storeName = extractStoreName(url);
-    console.log('Extracted store name:', storeName);
-    
-    const codes = await scrapeCouponCodes(storeName, url);
-    console.log('Found codes:', codes);
-
-    const bestCodes = selectBestCodes(codes);
-    console.log('Selected best codes:', bestCodes);
-
-    if (bestCodes.length > 0) {
-      cacheResult(url, bestCodes.map(code => code.code));
-      return res.json(bestCodes.map(code => code.code));
-    }
-
-    // If no codes found, try alternative store name formats
-    const altStoreName = storeName.replace(/-/g, '');
-    if (altStoreName !== storeName) {
-      const altCodes = await scrapeCouponCodes(altStoreName, url);
-      const altBestCodes = selectBestCodes(altCodes);
-      if (altBestCodes.length > 0) {
-        cacheResult(url, altBestCodes.map(code => code.code));
-        return res.json(altBestCodes.map(code => code.code));
-      }
-    }
-
-    // Last resort: return common codes for the store
-    const commonCodes = generateCommonCodes(storeName);
-    cacheResult(url, commonCodes);
-    return res.json(commonCodes);
-    
-  } catch (error) {
-    console.error('Server error:', error);
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to fetch coupon codes' 
-    });
-  }
-});
-
-async function scrapeCouponCodes(storeName: string, originalUrl: string): Promise<CouponCode[]> {
-  const allCodes: CouponCode[] = [];
-  const domain = new URL(originalUrl).hostname.replace('www.', '');
-
-  // Define scraping sources with their specific selectors
-  const sources = [
-    {
-      name: 'couponcabin',
-      url: `https://www.couponcabin.com/coupons/${storeName}/`,
-      selectors: {
-        codeElements: '.coupon_code',
-        codeAttr: 'data-clipboard-text',
-        descriptionSelector: '.description',
-        verifiedSelector: '.verified'
-      }
-    },
-    {
-      name: 'slickdeals',
-      url: `https://slickdeals.net/coupons/${domain}/`,
-      selectors: {
-        codeElements: '.couponCode',
-        codeAttr: 'data-clipboard-text',
-        descriptionSelector: '.description',
-        verifiedSelector: '.verified-coupon'
-      }
-    },
-    {
-      name: 'promocodes',
-      url: `https://www.promocodes.com/${storeName}`,
-      selectors: {
-        codeElements: '[data-code]',
-        codeAttr: 'data-code',
-        descriptionSelector: '.pc__description',
-        verifiedSelector: '.pc__verified'
-      }
-    }
-  ];
-
-  const scrapingPromises = sources.map(async (source) => {
-    try {
-      console.log(`Scraping ${source.name} for ${storeName}...`);
-      const response = await axios.get(source.url, {
-        headers: BROWSER_HEADERS,
-        timeout: 5000,
-        maxRedirects: 5
-      });
-
-      const $ = cheerio.load(response.data);
-      
-      $(source.selectors.codeElements).each((_, elem) => {
-        const codeElement = $(elem);
-        const code = codeElement.attr(source.selectors.codeAttr) || codeElement.text().trim();
-        
-        if (code && isPotentialCouponCode(code)) {
-          const description = codeElement.closest('div').find(source.selectors.descriptionSelector).text().trim();
-          const verified = codeElement.closest('div').find(source.selectors.verifiedSelector).length > 0;
-          
-          console.log(`Found code from ${source.name}:`, { code, description, verified });
-          
-          allCodes.push({
-            code: code.toUpperCase(),
-            description,
-            verified,
-            source: source.name
-          });
-        }
-      });
-
-    } catch (error) {
-      console.error(`Failed to scrape ${source.name}:`, error);
+async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Page> {
+  const page = await browser.newPage();
+  
+  page.on('console', (msg: puppeteer.ConsoleMessage) => console.log('Browser console:', msg.text()));
+  
+  await page.setViewport({ width: 1366, height: 768 });
+  
+  await page.setRequestInterception(true);
+  page.on('request', (request: puppeteer.HTTPRequest) => {
+    if (['image', 'font'].includes(request.resourceType())) {
+      request.abort();
+    } else {
+      request.continue();
     }
   });
 
-  await Promise.all(scrapingPromises);
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-  // Additional scraping for specific sites
+  return page;
+}
+
+async function extractCodeFromPopup(page: puppeteer.Page): Promise<string | null> {
   try {
-    const retailmenotResponse = await axios.get(`https://www.retailmenot.com/view/${domain}`, {
-      headers: BROWSER_HEADERS
+    await page.waitForSelector('[data-testid="voucherPopup-codeHolder-voucherType-code"] h4', {
+      timeout: 5000,
+      visible: true
     });
-    const $ = cheerio.load(retailmenotResponse.data);
-    
-    $('.sc-heading').each((_, elem) => {
-      const text = $(elem).text();
-      const codeMatch = text.match(/Use Code:\s*([A-Z0-9-]+)/i);
-      if (codeMatch && isPotentialCouponCode(codeMatch[1])) {
-        const description = $(elem).closest('.offer').find('.description').text().trim();
-        allCodes.push({
-          code: codeMatch[1].toUpperCase(),
-          description,
-          verified: true,
-          source: 'retailmenot'
-        });
-      }
-    });
+
+    const code = await page.$eval(
+      '[data-testid="voucherPopup-codeHolder-voucherType-code"] h4.b8qpi79',
+      (element: Element) => element.textContent
+    );
+
+    return code?.trim() || null;
   } catch (error) {
-    console.error('Failed to scrape RetailMeNot:', error);
-  }
-
-  return allCodes;
-}
-
-function selectBestCodes(codes: CouponCode[]): CouponCode[] {
-  // Remove duplicates while keeping the one with the best source/verification
-  const uniqueCodes = new Map<string, CouponCode>();
-  
-  codes.forEach(code => {
-    const existing = uniqueCodes.get(code.code);
-    if (!existing || (code.verified && !existing.verified)) {
-      uniqueCodes.set(code.code, code);
-    }
-  });
-
-  // Convert to array and sort by verification status and source reliability
-  return Array.from(uniqueCodes.values())
-    .sort((a, b) => {
-      if (a.verified && !b.verified) return -1;
-      if (!a.verified && b.verified) return 1;
-      
-      // Prioritize certain sources
-      const sourceRank = {
-        'retailmenot': 3,
-        'couponcabin': 2,
-        'promocodes': 1,
-        'slickdeals': 0
-      };
-      
-      return (sourceRank[b.source as keyof typeof sourceRank] || 0) - 
-             (sourceRank[a.source as keyof typeof sourceRank] || 0);
-    })
-    .slice(0, 3);
-}
-
-function generateCommonCodes(storeName: string): string[] {
-  return [
-    `${storeName.toUpperCase()}10`,
-    'WELCOME10',
-    'SAVE15'
-  ];
-}
-
-function isPotentialCouponCode(code: string): boolean {
-  if (!code || typeof code !== 'string') return false;
-  
-  const cleanCode = code.trim().toUpperCase();
-  
-  // Length check
-  if (cleanCode.length < 4 || cleanCode.length > 15) return false;
-  
-  // Must contain at least one letter and one number, or be a recognized pattern
-  const patterns = [
-    /^[A-Z0-9]{4,15}$/, // Basic alphanumeric
-    /^SAVE\d+$/,
-    /^NEW\d+$/,
-    /^\d+OFF$/,
-    /^[A-Z]+\d+[A-Z]*$/,
-    /^[A-Z]{2,}\d{2,}$/
-  ];
-
-  if (!patterns.some(pattern => pattern.test(cleanCode))) return false;
-
-  // Filter out common false positives
-  const blacklist = [
-    'DOCTYPE', 'HTTP', 'HTTPS', 'HTML', 'HEAD', 'BODY',
-    'SCRIPT', 'STYLE', 'META', 'LINK', 'DIV', 'SPAN'
-  ];
-  
-  if (blacklist.some(term => cleanCode.includes(term))) return false;
-
-  return true;
-}
-
-function isValidUrl(string: string): boolean {
-  try {
-    new URL(string);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function extractStoreName(url: string): string {
-  try {
-    const { hostname } = new URL(url);
-    return hostname
-      .replace('www.', '')
-      .replace('.com', '')
-      .replace(/\..+$/, '')
-      .toLowerCase();
-  } catch (_) {
-    return '';
-  }
-}
-
-function getCachedResult(url: string): string[] | null {
-  const cached = cache.get(url);
-  if (!cached) return null;
-  
-  if (Date.now() - cached.timestamp > CACHE_DURATION) {
-    cache.delete(url);
+    console.error('Error extracting code from popup:', error);
     return null;
   }
+}
+
+async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHandle, browser: puppeteer.Browser): Promise<CouponData | null> {
+  try {
+    const description = await card.$eval('h3', (element: Element) => element.textContent || '')
+      .catch(() => '');
+
+    const isCouponCode = await card.$eval(
+      '[data-element="voucher-card-labels"] div',
+      (element: Element) => element.textContent?.includes('Code') || false
+    ).catch(() => false);
+
+    console.log(`Card "${description}" - isCouponCode: ${isCouponCode}`);
+
+    if (!isCouponCode) {
+      console.log(`Card "${description}" is not a coupon code, skipping`);
+      return null;
+    }
+
+    const seeButton = await card.$('div[title="See coupon"]');
+    if (!seeButton) {
+      console.log(`No "See coupon" button found for "${description}", skipping`);
+      return null;
+    }
+
+    const newPagePromise = new Promise<puppeteer.Page>((resolve) => {
+      browser.on('targetcreated', async (target: puppeteer.Target) => {
+        if (target.type() === 'page') {
+          const newPage = await target.page();
+          if (newPage) resolve(newPage);
+        }
+      });
+    });
+
+    await seeButton.click();
+    const popupPage = await newPagePromise;
+    await popupPage.bringToFront();
+
+    const code = await extractCodeFromPopup(popupPage);
+    if (!code) {
+      await popupPage.close();
+      return null;
+    }
+
+    const expiry = await card.$eval('span:contains("Expires")', (element: Element) => element.textContent)
+      .then((textContent: string | null) => textContent?.replace('Expires:', '').trim())
+      .catch(() => undefined);
+
+    await popupPage.close();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    console.log(`Successfully extracted code "${code}" for "${description}"`);
+    return {
+      code,
+      description,
+      expiry
+    };
+  } catch (error) {
+    console.error('Error processing voucher card:', error);
+    return null;
+  }
+}
+
+async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
+  const browser = await initializeBrowser();
+
+  try {
+    const page = await initializePage(browser);
+
+    const storeName = new URL(storeUrl).hostname
+      .replace('www.', '')
+      .split('.')[0]
+      .toLowerCase()
+      .replace(/(clothing|shop|store|online)/g, '');
+    
+    const couponsUrl = `https://www.coupons.com/coupon-codes/${storeName}`;
+    console.log(`Navigating to ${couponsUrl}`);
+    
+    await page.goto(couponsUrl, {
+      waitUntil: 'networkidle0',
+      timeout: 30000
+    });
+
+    try {
+      await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', {
+        timeout: 20000
+      });
+    } catch (error) {
+      console.error('Voucher cards not found, attempting fallback scrape');
+      const fallbackCodes = await page.$$eval('h3, span, div', elements =>
+        elements
+          .map(el => el.textContent?.trim())
+          .filter(text => text && /^[A-Z0-9-]{4,15}$/.test(text))
+          .map(text => ({ code: text as string, description: 'Fallback code', expiry: undefined }))
+      );
+      if (fallbackCodes.length > 0) {
+        return fallbackCodes.slice(0, 3);
+      }
+      throw error;
+    }
+
+    const cards = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
+    console.log(`Found ${cards.length} voucher cards`);
+    
+    const coupons: CouponData[] = [];
+    
+    for (const card of cards.slice(0, 5)) {
+      const couponData = await handleVoucherCard(page, card, browser);
+      if (couponData && couponData.code) {
+        coupons.push(couponData);
+      }
+      
+      if (coupons.length >= 3) {
+        break;
+      }
+    }
+
+    console.log(`Collected ${coupons.length} coupons`);
+    return coupons;
+
+  } catch (error) {
+    console.error('Scraping error:', error);
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
+
+app.post('/api/coupons', async (req: express.Request, res: express.Response) => {
+  const { url } = req.body;
   
-  return cached.data;
-}
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
 
-function cacheResult(url: string, data: string[]) {
-  cache.set(url, {
-    data,
-    timestamp: Date.now()
-  });
-}
+  try {
+    const coupons = await scrapeCoupons(url);
+    
+    if (coupons.length === 0) {
+      console.log('No valid coupon codes found, returning empty array');
+      return res.json([]);
+    }
 
-const PORT = process.env.PORT || 3001;
+    const codes = coupons.map(coupon => coupon.code);
+    console.log('Returning codes to client:', codes);
+    res.json(codes);
+
+  } catch (error) {
+    console.error('Error processing request:', error);
+    res.status(500).json({ error: 'Failed to scrape coupon codes' });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-export default app;

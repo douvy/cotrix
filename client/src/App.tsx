@@ -7,61 +7,62 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  function doSearch() {
+    if (!url) {
+      setError('Please enter a URL');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setCodes([]);
 
-    if (!url) {
-      setError('Please enter a valid URL');
-      setLoading(false);
-      return;
-    }
+    let isCancelled = false;
 
-    try {
-      const response = await fetch('http://localhost:3001/api/coupons', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
+    fetch('http://localhost:3001/api/coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (isCancelled) return;
+        console.log('Received data from server:', data);
+        if (Array.isArray(data)) {
+          setCodes(data);
+        } else if (data.error) {
+          setError(data.error);
+        } else {
+          setError('Unexpected response format');
+        }
+      })
+      .catch(err => {
+        if (isCancelled) return;
+        setError(err.message || 'Failed to fetch codes');
+        console.error('Fetch error:', err);
+      })
+      .finally(() => {
+        if (isCancelled) return;
+        setLoading(false);
       });
 
-      const data = await response.json();
+    return () => { isCancelled = true; };
+  }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch coupon codes');
-      }
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(''), 2000);
+  }
 
-      if (Array.isArray(data)) {
-        setCodes(data);
-      } else if (data.error) {
-        setError(data.error);
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Failed to fetch coupon codes. Please try again.');
-      }
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCopyCode = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(''), 3000);
-    } catch (error) {
-      console.error('Failed to copy code:', error);
-    }
-  };
+  function updateUrl(newValue: string) {
+    setUrl(newValue);
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white">
@@ -77,28 +78,23 @@ function App() {
         </section>
 
         <section className="max-w-2xl mx-auto bg-[#0f0f0f] border border-[#262626] rounded p-6">
-          <form onSubmit={handleSubmit} className="flex flex-row items-center gap-4">
-            <label htmlFor="storeUrl" className="sr-only">
-              Store URL
-            </label>
+          <div className="flex flex-row items-center gap-4">
             <input
-              id="storeUrl"
-              type="url"
+              type="text"
               placeholder="https://www.example.com"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={e => updateUrl(e.target.value)}
               className="h-10 flex-grow p-2 bg-[#141414] border border-[#262626] rounded focus:outline-none focus:border-[#b62779] hover:border-[#404040]"
               disabled={loading}
-              required
             />
             <button
-              type="submit"
+              onClick={() => doSearch()}
               disabled={loading}
               className="h-10 px-6 bg-[#b62779] text-white rounded hover:opacity-90 transition-opacity text-sm font-semibold disabled:opacity-50"
             >
               {loading ? 'Searching...' : 'Find Coupons'}
             </button>
-          </form>
+          </div>
 
           {error && (
             <div className="mt-4 text-red-500 text-center">
@@ -119,10 +115,10 @@ function App() {
                 {codes.map((code, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleCopyCode(code)}
+                    onClick={() => copyCode(code)}
                     className="group relative bg-[#141414] border border-[#262626] rounded p-6 text-center cursor-pointer hover:border-[#404040] transition-colors"
                   >
-                    <h1 className="text-xl tracking-wider">{code}</h1>
+                    <h1 className="text-md tracking-wider">{code}</h1>
 
                     {copiedCode !== code && (
                       <div className="absolute top-1 right-1 flex items-center gap-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity delay-100">
@@ -177,7 +173,7 @@ function App() {
       </main>
 
       <footer className="mt-auto bg-[#010101] border-t border-[#262626] py-4 text-center text-[#A1A1A1] text-sm">
-        &copy; {new Date().getFullYear()} Cotrix. All rights reserved.
+        © 2024 Cotrix. All rights reserved.
       </footer>
     </div>
   );
