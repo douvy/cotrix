@@ -73,7 +73,7 @@ function App() {
       <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
         <section className="mb-8 text-center">
           <h3 className="text-[#999] tracking-wider text-2xl">
-            Enter a store URL to get the top 3 coupon codes
+            Enter a store URL to get the top coupon code(s)
           </h3>
         </section>
 
