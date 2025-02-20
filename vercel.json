@@ -22,10 +22,5 @@
       "src": "/(.*)",
       "dest": "client/$1"
     }
-  ],
-  "functions": {
-    "api/src/server.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
