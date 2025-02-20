@@ -9,11 +9,11 @@
   "routes": [
     {
       "src": "/api/coupons",
-      "dest": "/api/index.ts"
+      "dest": "/api/server.ts"
     },
     {
       "src": "/(.*)",
-      "dest": "/api/index.ts"
+      "dest": "/api/server.ts"
     }
   ]
 }
