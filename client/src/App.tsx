@@ -70,33 +70,33 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white">
-      <header className="bg-[#010101] border-b border-[#262626] px-6 py-4">
-        <h1 className="text-2xl font-bold tracking-wider text-white">Cotrix</h1>
+      <header className="bg-[#010101] border-b border-[#262626] px-4 sm:px-6 py-4">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-wider text-white">Cotrix</h1>
       </header>
 
-      <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
-        <section className="mb-8 text-center">
-          <h3 className="text-[#999] tracking-wider text-2xl">
+      <main className="flex-grow px-4 py-6 sm:px-8 lg:px-16 sm:py-8">
+        <section className="mb-6 sm:mb-8 text-center">
+          <h3 className="text-xl sm:text-2xl text-[#999] tracking-wider px-2">
             Enter a store URL to get the top coupon code
           </h3>
         </section>
 
-        <section className="max-w-2xl mx-auto bg-[#0f0f0f] border border-[#262626] rounded p-6">
-          <div className="flex flex-row items-center gap-4">
+        <section className="max-w-2xl mx-auto bg-[#0f0f0f] border border-[#262626] rounded p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <input
               type="text"
               placeholder="https://www.example.com"
               value={url}
               onChange={e => updateUrl(e.target.value)}
-              className="h-10 flex-grow p-2 bg-[#141414] border border-[#262626] rounded focus:outline-none focus:border-[#b62779] hover:border-[#404040]"
+              className="h-12 sm:h-10 flex-grow p-3 sm:p-2 bg-[#141414] border border-[#262626] rounded text-base focus:outline-none focus:border-[#b62779] hover:border-[#404040]"
               disabled={loading}
             />
             <button
               onClick={() => doSearch()}
               disabled={loading}
-              className="h-10 px-6 bg-[#b62779] text-white rounded hover:opacity-90 transition-opacity text-sm font-semibold disabled:opacity-50"
+              className="h-12 sm:h-10 px-6 bg-[#b62779] text-white rounded hover:opacity-90 transition-opacity text-base sm:text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? 'Searching...' : 'Find Coupons'}
+              {loading ? 'Searching...' : 'Find Coupon'}
             </button>
           </div>
 
@@ -107,28 +107,28 @@ function App() {
           )}
 
           {loading && (
-            <div className="mt-8 text-center text-[#999]">
+            <div className="mt-6 sm:mt-8 text-center text-[#999]">
               Searching for coupon code...
             </div>
           )}
 
           {!loading && codes.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-6 sm:mt-8">
               <h2 className="text-lg mb-4 tracking-wider">Best coupon code found</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                 {codes.map((code, idx) => (
                   <button
                     key={idx}
                     onClick={() => copyCode(code)}
-                    className="group relative bg-[#141414] border border-[#262626] rounded p-6 text-center cursor-pointer hover:border-[#404040] transition-colors"
+                    className="group relative bg-[#141414] border border-[#262626] rounded p-6 text-center cursor-pointer hover:border-[#404040] transition-colors min-h-[80px] flex items-center justify-center"
                   >
-                    <h1 className="text-md tracking-wider">{code}</h1>
+                    <h1 className="text-lg sm:text-md tracking-wider">{code}</h1>
 
                     {copiedCode !== code && (
-                      <div className="absolute top-1 right-1 flex items-center gap-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity delay-100">
+                      <div className="absolute top-2 right-2 flex items-center gap-1 text-sm sm:text-xs text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity delay-100">
                         <svg
-                          width="14"
-                          height="14"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           xmlns="http://www.w3.org/2000/svg"
@@ -146,11 +146,11 @@ function App() {
                     )}
 
                     {copiedCode === code && (
-                      <div className="absolute top-1 right-1 flex items-center gap-1 text-xs text-white">
+                      <div className="absolute top-2 right-2 flex items-center gap-1 text-sm sm:text-xs text-white">
                         <svg
                           aria-label="Verified"
-                          width="18"
-                          height="18"
+                          width="20"
+                          height="20"
                           viewBox="0 -960 960 960"
                           fill="none"
                           xmlns="http://www.w3.org/2000/svg"
@@ -165,7 +165,7 @@ function App() {
                             fill="#ffffff"
                           />
                         </svg>
-                        <span className="text-xs">Copied</span>
+                        <span>Copied</span>
                       </div>
                     )}
                   </button>
