@@ -4,16 +4,23 @@
     {
       "src": "api/src/server.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "zeroConfig": true
+      }
     }
   ],
   "routes": [
     {
-      "src": "/api/coupons",
+      "src": "/api/(.*)",
       "dest": "api/src/server.ts"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "api/src/server.ts"
+      "src": "/(.*)",
+      "dest": "client/$1"
     }
   ],
   "functions": {
