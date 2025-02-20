@@ -11,6 +11,28 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  function formatUrl(input: string): string {
+    // Remove any existing protocol
+    let cleanUrl = input.replace(/^(https?:\/\/)?(www\.)?/, '');
+    
+    // If they paste a full URL, preserve the protocol they used
+    if (input.startsWith('http://')) {
+      return `http://${cleanUrl}`;
+    }
+    
+    // Default to https://
+    return `https://${cleanUrl}`;
+  }
+
+  function updateUrl(newValue: string) {
+    // Only auto-format if there's content and it contains a '.'
+    if (newValue && newValue.includes('.')) {
+      setUrl(formatUrl(newValue));
+    } else {
+      setUrl(newValue);
+    }
+  }
+
   function doSearch() {
     if (!url) {
       setError('Please enter a URL');
@@ -64,10 +86,6 @@ function App() {
     setTimeout(() => setCopiedCode(''), 2000);
   }
 
-  function updateUrl(newValue: string) {
-    setUrl(newValue);
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-black text-white">
       <header className="bg-[#010101] border-b border-[#262626] px-4 sm:px-6 py-4">
@@ -85,7 +103,7 @@ function App() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <input
               type="text"
-              placeholder="https://www.example.com"
+              placeholder="example.com"
               value={url}
               onChange={e => updateUrl(e.target.value)}
               className="h-12 sm:h-10 flex-grow p-3 sm:p-2 bg-[#141414] border border-[#262626] rounded text-base focus:outline-none focus:border-[#b62779] hover:border-[#404040]"
@@ -96,7 +114,7 @@ function App() {
               disabled={loading}
               className="h-12 sm:h-10 px-6 bg-[#b62779] text-white rounded hover:opacity-90 transition-opacity text-base sm:text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? 'Searching...' : 'Find Coupon'}
+              {loading ? 'Searching...' : 'Find Coupons'}
             </button>
           </div>
 
