@@ -9,53 +9,45 @@ interface CouponData {
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
- const isProd = process.env.NODE_ENV === 'production';
- console.log('Running in environment:', process.env.NODE_ENV);
- 
- const options = {
-   args: [
-     '--no-sandbox',
-     '--disable-setuid-sandbox',
-     '--disable-dev-shm-usage',
-     '--disable-gpu',
-     '--single-process',
-     '--no-zygote',
-     '--no-first-run',
-     '--disable-extensions',
-     '--disable-web-security',
-     '--disable-features=site-per-process',
-     '--disable-dev-tools',
-     '--window-size=1920,1080',
-     '--proxy-server="direct://"',
-     '--proxy-bypass-list=*',
-     '--deterministic-fetch'
-   ],
-   headless: true,
-   ignoreHTTPSErrors: true,
-   timeout: 30000
- } as puppeteer.LaunchOptions;
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log('Running in environment:', process.env.NODE_ENV);
+  
+  const options = {
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-extensions'
+    ],
+    headless: true,
+    ignoreHTTPSErrors: true
+  } as puppeteer.LaunchOptions;
 
- try {
-   console.log('Attempting to launch browser with options:', JSON.stringify(options, null, 2));
-   const browser = await puppeteer.launch(options);
-   console.log('Browser launched successfully');
-   
-   const version = await browser.version();
-   console.log('Chrome version:', version);
-   
-   return browser;
- } catch (error) {
-   console.error('Failed to launch browser:', error);
-   if (isProd) {
-     // Try fallback options
-     console.log('Trying fallback launch...');
-     return puppeteer.launch({
-       args: ['--no-sandbox'],
-       headless: true
-     });
-   }
-   throw error;
- }
+  try {
+    console.log('Attempting to launch browser with options:', JSON.stringify(options, null, 2));
+    const browser = await puppeteer.launch(options);
+    console.log('Browser launched successfully');
+    
+    const version = await browser.version();
+    console.log('Chrome version:', version);
+    
+    return browser;
+  } catch (error) {
+    console.error('Failed to launch browser:', error);
+    if (isProd) {
+      // Try minimal fallback options
+      console.log('Trying fallback launch...');
+      return puppeteer.launch({
+        args: ['--no-sandbox'],
+        headless: true
+      });
+    }
+    throw error;
+  }
 }
 
 async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Page> {

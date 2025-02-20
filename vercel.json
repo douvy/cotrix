@@ -1,44 +1,32 @@
 {
-    "version": 2,
-    "builds": [
-      {
-        "src": "api/src/server.ts",
-        "use": "@vercel/node"
-      },
-      {
-        "src": "client/package.json",
-        "use": "@vercel/static-build",
-        "config": {
-          "zeroConfig": true
-        }
-      }
-    ],
-    "routes": [
-      {
-        "src": "/api/(.*)",
-        "dest": "api/src/server.ts"
-      },
-      {
-        "src": "/static/(.*)",
-        "dest": "/client/static/$1"
-      },
-      {
-        "src": "/favicon.ico",
-        "dest": "/client/favicon.ico"
-      },
-      {
-        "src": "/manifest.json",
-        "dest": "/client/manifest.json"
-      },
-      {
-        "src": "/(.*)",
-        "dest": "/client/index.html"
-      }
-    ],
-    "functions": {
-      "api/**/*": {
-        "memory": 3008,
-        "maxDuration": 60
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/src/server.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "zeroConfig": true
       }
     }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/src/server.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "client/$1"
+    }
+  ],
+  "functions": {
+    "api/**/*": {
+      "memory": 3008,
+      "maxDuration": 60
+    }
+  }
 }
