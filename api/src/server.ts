@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import * as puppeteer from 'puppeteer';
+import { executablePath } from 'puppeteer';
 
 interface CouponData {
  code: string;
@@ -20,7 +21,10 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
      '--no-first-run'
    ],
    headless: true,
-   ignoreHTTPSErrors: true
+   ignoreHTTPSErrors: true,
+   executablePath: process.env.NODE_ENV === 'production' 
+     ? '/var/task/node_modules/puppeteer/.local-chromium/linux-115.0.5790.170/chrome-linux/chrome'
+     : executablePath()
  } as puppeteer.LaunchOptions;
 
  try {
@@ -30,6 +34,7 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
    return browser;
  } catch (error) {
    console.error('Failed to launch browser:', error);
+   console.error('Chrome executable path:', options.executablePath);
    throw error;
  }
 }
@@ -51,9 +56,14 @@ async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Pag
    await page.setRequestInterception(true);
    
    page.on('request', (request: puppeteer.HTTPRequest) => {
-     if (['image', 'font'].includes(request.resourceType())) {
-       request.abort();
-     } else {
+     try {
+       if (['image', 'font'].includes(request.resourceType())) {
+         request.abort();
+       } else {
+         request.continue();
+       }
+     } catch (error) {
+       console.error('Error in request interception:', error);
        request.continue();
      }
    });
@@ -147,26 +157,42 @@ async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHa
 async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
  let browser;
  try {
+   console.log('Environment:', process.env.NODE_ENV);
+   console.log('Starting browser initialization for URL:', storeUrl);
+   
    browser = await initializeBrowser();
    const page = await initializePage(browser);
+   
+   console.log('Parsing store name from URL:', storeUrl);
    const storeName = new URL(storeUrl).hostname.replace('www.', '').split('.')[0].toLowerCase().replace(/(clothing|shop|store|online)/g, '');
    const couponsUrl = `https://www.coupons.com/coupon-codes/${storeName}`;
    console.log(`Navigating to ${couponsUrl}`);
    
-   await page.goto(couponsUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+   await page.goto(couponsUrl, { 
+     waitUntil: 'networkidle0', 
+     timeout: 30000 
+   });
 
    try {
+     console.log('Waiting for voucher cards...');
      await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', { timeout: 20000 });
+     console.log('Voucher cards found');
    } catch (error) {
-     console.error('Voucher cards not found, attempting fallback scrape');
+     console.log('No voucher cards found, trying fallback method');
      const fallbackCodes = await page.$$eval('h3, span, div', elements =>
        elements
          .map(el => el.textContent?.trim())
          .filter(text => text && /^[A-Z0-9-]{4,15}$/.test(text))
          .map(text => ({ code: text as string, description: 'Fallback code', expiry: undefined }))
      );
-     if (fallbackCodes.length > 0) return fallbackCodes.slice(0, 3);
-     throw error;
+     
+     if (fallbackCodes.length > 0) {
+       console.log('Found fallback codes:', fallbackCodes);
+       return fallbackCodes.slice(0, 3);
+     }
+     
+     console.error('No codes found with fallback method');
+     return [];
    }
 
    const cards = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
@@ -174,18 +200,23 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
    
    const coupons: CouponData[] = [];
    for (const card of cards.slice(0, 5)) {
-     const couponData = await handleVoucherCard(page, card, browser);
-     if (couponData && couponData.code) {
-       coupons.push(couponData);
+     try {
+       const couponData = await handleVoucherCard(page, card, browser);
+       if (couponData && couponData.code) {
+         coupons.push(couponData);
+       }
+       if (coupons.length >= 3) break;
+     } catch (error) {
+       console.error('Error processing individual card:', error);
+       continue;
      }
-     if (coupons.length >= 3) break;
    }
 
-   console.log(`Collected ${coupons.length} coupons`);
+   console.log(`Successfully collected ${coupons.length} coupons`);
    return coupons;
  } catch (error) {
-   console.error('Scraping error:', error);
-   throw error;
+   console.error('Fatal scraping error:', error);
+   return [];  // Return empty array instead of throwing
  } finally {
    if (browser) {
      try {
