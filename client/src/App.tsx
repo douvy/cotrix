@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api/coupons'
+  : 'http://localhost:3001/api/coupons';
+
 function App() {
   const [url, setUrl] = useState('');
   const [codes, setCodes] = useState<string[]>([]);
@@ -19,7 +23,7 @@ function App() {
 
     let isCancelled = false;
 
-    fetch('http://localhost:3001/api/coupons', {
+    fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
