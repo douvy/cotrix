@@ -13,7 +13,18 @@ interface CouponData {
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
-  return await puppeteer.launch({
+  // Check if running on Vercel
+  const options = process.env.AWS_LAMBDA_FUNCTION_VERSION ? {
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--single-process'
+    ],
+    headless: true,
+    ignoreHTTPSErrors: true,
+    executablePath: process.env.CHROME_EXECUTABLE_PATH || '/opt/chrome/chrome',
+  } : {
     headless: true,
     args: [
       '--no-sandbox',
@@ -21,7 +32,9 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
       '--disable-dev-shm-usage',
       '--disable-gpu'
     ]
-  });
+  };
+
+  return await puppeteer.launch(options);
 }
 
 async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Page> {
@@ -160,11 +173,15 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
   }
 }
 
-app.get('/', (req: express.Request, res: express.Response) => {
+const handler = express();
+handler.use(cors());
+handler.use(express.json());
+
+handler.get('/', (req: express.Request, res: express.Response) => {
   res.json({ message: 'Cotrix API is live! Use POST /api/coupons with { "url": "https://store.com" }' });
 });
 
-app.post('/api/coupons', async (req: express.Request, res: express.Response) => {
+handler.post('/api/coupons', async (req: express.Request, res: express.Response) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
@@ -183,11 +200,9 @@ app.post('/api/coupons', async (req: express.Request, res: express.Response) => 
   }
 });
 
-export default app;
-
-const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+  handler.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
-module.exports = app;
+export default handler;
