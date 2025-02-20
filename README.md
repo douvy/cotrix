@@ -6,7 +6,7 @@ Coupon code finder for online stores.
 
 Cotrix is a web app that helps users find and validate discount codes in real-time. Built with React and Node.js, it features a clean interface and uses headless browser automation for reliable code discovery.
 
-## Features in Development
+## Features
 - Real-time coupon code scraping
 - One-click code copying
 - Automatic URL formatting
