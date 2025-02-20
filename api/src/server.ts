@@ -13,25 +13,16 @@ interface CouponData {
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
-  // Check if running on Vercel
-  const options = process.env.AWS_LAMBDA_FUNCTION_VERSION ? {
+  // Vercel-optimized browser options
+  const options = {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
+      '--disable-gpu',
       '--single-process'
     ],
-    headless: true,
-    ignoreHTTPSErrors: true,
-    executablePath: process.env.CHROME_EXECUTABLE_PATH || '/opt/chrome/chrome',
-  } : {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu'
-    ]
+    headless: true
   };
 
   return await puppeteer.launch(options);
