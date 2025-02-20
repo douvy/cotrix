@@ -174,7 +174,7 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
       
       if (fallbackCodes.length > 0) {
         console.log('Found fallback codes:', fallbackCodes);
-        return fallbackCodes.slice(0, 3);
+        return fallbackCodes.slice(0, 1);  // Changed to only return 1 code
       }
       
       console.error('No codes found with fallback method');
@@ -185,13 +185,13 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
     console.log(`Found ${cards.length} voucher cards`);
     
     const coupons: CouponData[] = [];
-    for (const card of cards.slice(0, 5)) {
+    for (const card of cards.slice(0, 1)) {  // Changed to only process 1 card
       try {
         const couponData = await handleVoucherCard(page, card, browser);
         if (couponData && couponData.code) {
           coupons.push(couponData);
         }
-        if (coupons.length >= 3) break;
+        if (coupons.length >= 1) break;  // Break after first successful code
       } catch (error) {
         console.error('Error processing individual card:', error);
         continue;
