@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import * as puppeteer from 'puppeteer-core';
@@ -16,7 +17,8 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
     }
     
     const browser = await puppeteer.connect({
-      browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BLESS_TOKEN}`,
+      browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BLESS_TOKEN}&timeout=30000`,
+      defaultViewport: { width: 1366, height: 768 }
     });
     console.log('Connected to browserless successfully');
     return browser;
@@ -36,15 +38,12 @@ async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Pag
     page.on('error', err => console.error('Page error:', err));
     page.on('pageerror', err => console.error('Page error:', err));
     
-    console.log('Setting viewport');
-    await page.setViewport({ width: 1366, height: 768 });
-    
     console.log('Setting request interception');
     await page.setRequestInterception(true);
     
     page.on('request', (request) => {
       try {
-        if (['image', 'font'].includes(request.resourceType())) {
+        if (['image', 'font', 'stylesheet'].includes(request.resourceType())) {
           request.abort();
         } else {
           request.continue();
@@ -156,13 +155,13 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
     console.log(`Navigating to ${couponsUrl}`);
     
     await page.goto(couponsUrl, { 
-      waitUntil: 'networkidle0', 
-      timeout: 30000 
+      waitUntil: 'domcontentloaded', // Changed from networkidle0 for faster loading
+      timeout: 15000 
     });
 
     try {
       console.log('Waiting for voucher cards...');
-      await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', { timeout: 20000 });
+      await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', { timeout: 10000 });
       console.log('Voucher cards found');
     } catch (error) {
       console.log('No voucher cards found, trying fallback method');
@@ -254,7 +253,6 @@ app.post('/api/coupons', async (req: express.Request, res: express.Response) => 
   }
 });
 
-// Only start the server if we're not in production (Vercel handles this in prod)
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
