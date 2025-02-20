@@ -8,8 +8,18 @@
   ],
   "routes": [
     {
+      "src": "/api/coupons",
+      "dest": "api/src/server.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "api/src/server.ts"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*": {
+      "memory": 3008,
+      "maxDuration": 60
+    }
+  }
 }
