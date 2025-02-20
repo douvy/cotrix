@@ -114,7 +114,7 @@ function App() {
               disabled={loading}
               className="h-12 sm:h-10 px-6 bg-[#b62779] text-white rounded hover:opacity-90 transition-opacity text-base sm:text-sm font-semibold disabled:opacity-50"
             >
-              {loading ? 'Searching...' : 'Find Coupons'}
+              {loading ? 'Searching...' : 'Find Coupon'}
             </button>
           </div>
 
