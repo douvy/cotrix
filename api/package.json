@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "NODE_ENV=development ts-node src/server.ts"
+    "dev": "NODE_ENV=development ts-node src/server.ts",
+    "vercel-build": "npm install --production=false && npm run build"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +19,7 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "http-cookie-agent": "^5.0.4",
-    "puppeteer": "^24.2.1",
+    "puppeteer": "^21.7.0",
     "tough-cookie": "^4.1.4"
   },
   "devDependencies": {

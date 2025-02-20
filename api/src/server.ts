@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import * as puppeteer from 'puppeteer';
-import { executablePath } from 'puppeteer';
 
 interface CouponData {
  code: string;
@@ -10,6 +9,9 @@ interface CouponData {
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
+ const isProd = process.env.NODE_ENV === 'production';
+ console.log('Running in environment:', process.env.NODE_ENV);
+ 
  const options = {
    args: [
      '--no-sandbox',
@@ -18,23 +20,40 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
      '--disable-gpu',
      '--single-process',
      '--no-zygote',
-     '--no-first-run'
+     '--no-first-run',
+     '--disable-extensions',
+     '--disable-web-security',
+     '--disable-features=site-per-process',
+     '--disable-dev-tools',
+     '--window-size=1920,1080',
+     '--proxy-server="direct://"',
+     '--proxy-bypass-list=*',
+     '--deterministic-fetch'
    ],
    headless: true,
    ignoreHTTPSErrors: true,
-   executablePath: process.env.NODE_ENV === 'production' 
-     ? '/var/task/node_modules/puppeteer/.local-chromium/linux-115.0.5790.170/chrome-linux/chrome'
-     : executablePath()
+   timeout: 30000
  } as puppeteer.LaunchOptions;
 
  try {
-   console.log('Launching browser with options:', options);
+   console.log('Attempting to launch browser with options:', JSON.stringify(options, null, 2));
    const browser = await puppeteer.launch(options);
    console.log('Browser launched successfully');
+   
+   const version = await browser.version();
+   console.log('Chrome version:', version);
+   
    return browser;
  } catch (error) {
    console.error('Failed to launch browser:', error);
-   console.error('Chrome executable path:', options.executablePath);
+   if (isProd) {
+     // Try fallback options
+     console.log('Trying fallback launch...');
+     return puppeteer.launch({
+       args: ['--no-sandbox'],
+       headless: true
+     });
+   }
    throw error;
  }
 }
