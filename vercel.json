@@ -1,19 +1,15 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/server.ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/coupons",
-      "dest": "/api/server.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/server.ts"
-    }
-  ]
-}
+    "version": 2,
+    "builds": [
+      {
+        "src": "server.ts",
+        "use": "@vercel/node"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/(.*)",
+        "dest": "server.ts"
+      }
+    ]
+  }
