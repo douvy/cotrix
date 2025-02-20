@@ -77,7 +77,7 @@ function App() {
       <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
         <section className="mb-8 text-center">
           <h3 className="text-[#999] tracking-wider text-2xl">
-            Enter a store URL to get the top coupon code(s)
+            Enter a store URL to get the top coupon code
           </h3>
         </section>
 
@@ -108,13 +108,13 @@ function App() {
 
           {loading && (
             <div className="mt-8 text-center text-[#999]">
-              Searching for coupon codes...
+              Searching for coupon code...
             </div>
           )}
 
           {!loading && codes.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg mb-4 tracking-wider">Best coupon code(s) found</h2>
+              <h2 className="text-lg mb-4 tracking-wider">Best coupon code found</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {codes.map((code, idx) => (
                   <button
