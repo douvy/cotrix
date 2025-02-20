@@ -1,20 +1,19 @@
 {
     "version": 2,
-    "buildCommand": "npm run build",
     "builds": [
       {
-        "src": "dist/server.js",
+        "src": "api/server.ts",
         "use": "@vercel/node"
       }
     ],
     "routes": [
       {
         "src": "/api/coupons",
-        "dest": "dist/server.js"
+        "dest": "api/server.ts"
       },
       {
         "src": "/(.*)",
-        "dest": "dist/server.js"
+        "dest": "api/server.ts"
       }
     ]
   }
