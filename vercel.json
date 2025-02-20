@@ -2,8 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/src/server.ts",
-      "use": "@vercel/node"
+      "src": "api/dist/server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["api/dist/**"]
+      }
     },
     {
       "src": "client/package.json",
@@ -16,7 +19,10 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/src/server.ts"
+      "dest": "api/dist/server.js"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
@@ -24,7 +30,7 @@
     }
   ],
   "functions": {
-    "api/**/*": {
+    "api/dist/**": {
       "memory": 3008,
       "maxDuration": 60
     }
