@@ -2,10 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import * as puppeteer from 'puppeteer';
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
 interface CouponData {
   code: string;
   description: string;
@@ -13,7 +9,6 @@ interface CouponData {
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
-  // Vercel-optimized browser options
   const options = {
     args: [
       '--no-sandbox',
@@ -164,15 +159,15 @@ async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
   }
 }
 
-const handler = express();
-handler.use(cors());
-handler.use(express.json());
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-handler.get('/', (req: express.Request, res: express.Response) => {
+app.get('/', (req: express.Request, res: express.Response) => {
   res.json({ message: 'Cotrix API is live! Use POST /api/coupons with { "url": "https://store.com" }' });
 });
 
-handler.post('/api/coupons', async (req: express.Request, res: express.Response) => {
+app.post('/api/coupons', async (req: express.Request, res: express.Response) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
@@ -191,9 +186,12 @@ handler.post('/api/coupons', async (req: express.Request, res: express.Response)
   }
 });
 
+// Add development server
 if (process.env.NODE_ENV !== 'production') {
-  const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
-  handler.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
-export default handler;
+export default app;
