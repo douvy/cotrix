@@ -1,7 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import * as puppeteer from 'puppeteer-core';
+import * as puppeteerCore from 'puppeteer-core';
+import * as puppeteer from 'puppeteer';
+
+// Type can be either browser type since they share the same interface
+type Browser = puppeteer.Browser | puppeteerCore.Browser;
 
 interface CouponData {
   code: string;
