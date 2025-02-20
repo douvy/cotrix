@@ -9,7 +9,7 @@
         "src": "client/package.json",
         "use": "@vercel/static-build",
         "config": {
-          "distDir": "build"
+          "zeroConfig": true
         }
       }
     ],
@@ -19,7 +19,16 @@
         "dest": "/api/src/server.ts"
       },
       {
-        "handle": "filesystem"
+        "src": "/static/(.*)",
+        "dest": "/client/static/$1"
+      },
+      {
+        "src": "/favicon.ico",
+        "dest": "/client/favicon.ico"
+      },
+      {
+        "src": "/manifest.json",
+        "dest": "/client/manifest.json"
       },
       {
         "src": "/(.*)",
