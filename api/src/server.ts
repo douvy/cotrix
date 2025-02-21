@@ -4,38 +4,46 @@ import cors from 'cors';
 import * as puppeteerCore from 'puppeteer-core';
 import * as puppeteer from 'puppeteer';
 
-// Type can be either browser type since they share the same interface
-type Browser = puppeteer.Browser | puppeteerCore.Browser;
+type Browser = puppeteer.Browser;
 
 interface ExtractedCouponData {
   code: string;
   description: string;
   expiry?: string;
-  source: 'coupons.com' | 'couponfollow.com';
+  source: 'coupons.com';
   isVerified: boolean;
   discountPercent: number;
 }
 
-async function initializeBrowser(): Promise<puppeteer.Browser> {
+async function initializeBrowser(): Promise<Browser> {
   try {
-    console.log('Connecting to browserless...');
-    if (!process.env.BLESS_TOKEN) {
-      throw new Error('BLESS_TOKEN environment variable is not set');
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Running in production mode, connecting to browserless...');
+      if (!process.env.BLESS_TOKEN) {
+        throw new Error('BLESS_TOKEN environment variable is not set');
+      }
+      const browser = await puppeteerCore.connect({
+        browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BLESS_TOKEN}&timeout=30000`,
+        defaultViewport: { width: 1366, height: 768 }
+      });
+      console.log('Connected to browserless successfully');
+      return browser as unknown as Browser;
+    } else {
+      console.log('Running in development mode, launching local browser...');
+      const browser = await puppeteer.launch({
+        headless: true,
+        defaultViewport: { width: 1366, height: 768 }
+      });
+      console.log('Local browser launched successfully');
+      return browser;
     }
-    
-    const browser = await puppeteer.connect({
-      browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BLESS_TOKEN}&timeout=30000`,
-      defaultViewport: { width: 1366, height: 768 }
-    });
-    console.log('Connected to browserless successfully');
-    return browser;
   } catch (error) {
-    console.error('Failed to connect to browserless:', error);
+    console.error('Failed to initialize browser:', error);
     throw error;
   }
 }
 
-async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Page> {
+async function initializePage(browser: Browser): Promise<puppeteer.Page> {
   try {
     const page = await browser.newPage();
     
@@ -84,7 +92,7 @@ async function extractCodeFromPopup(page: puppeteer.Page): Promise<string | null
   }
 }
 
-async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHandle<Element>, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
+async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHandle<Element>, browser: Browser): Promise<ExtractedCouponData | null> {
   try {
     const cardData = await card.evaluate((el: Element) => {
       const description = el.querySelector('h3')?.textContent || 'Unknown description';
@@ -142,7 +150,7 @@ async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHa
   }
 }
 
-async function scrapeCouponsDotCom(storeUrl: string, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
+async function scrapeCouponsDotCom(storeUrl: string, browser: Browser): Promise<ExtractedCouponData | null> {
   const page = await initializePage(browser);
   try {
     const storeName = new URL(storeUrl).hostname
@@ -157,86 +165,21 @@ async function scrapeCouponsDotCom(storeUrl: string, browser: puppeteer.Browser)
     try {
       await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', { timeout: 10000 });
 
-      const cardElements = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
-      if (!cardElements || cardElements.length === 0) {
-        console.log('No voucher cards found on Coupons.com');
-        return null;
-      }
-      
-      console.log(`Found ${cardElements.length} voucher cards on Coupons.com`);
+      const cards = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
+      console.log(`Found ${cards.length} voucher cards on Coupons.com`);
 
-      for (let i = 0; i < cardElements.length; i++) {
-        const couponData = await handleVoucherCard(page, cardElements[i], browser);
+      for (const card of cards) {
+        const couponData = await handleVoucherCard(page, card, browser);
         if (couponData) return couponData;
       }
-
-      return null;
     } catch (error) {
       console.log('No valid voucher cards found on Coupons.com');
       return null;
     }
 
+    return null;
   } catch (error) {
     console.error('Error scraping Coupons.com:', error);
-    return null;
-  } finally {
-    await page.close();
-  }
-}
-
-async function scrapeCouponFollow(storeUrl: string, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
-  const page = await initializePage(browser);
-  try {
-    const storeName = new URL(storeUrl).hostname.replace('www.', '').split('.')[0];
-    const url = `https://couponfollow.com/site/${storeName}.com`;
-    
-    console.log(`Navigating to ${url}`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    // Wait for offers to load
-    await page.waitForSelector('.offer-card.regular-offer', { timeout: 10000 });
-    
-    const offers = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll<HTMLElement>('.offer-card.regular-offer'));
-      return cards.map(card => {
-        const codeElement = card.querySelector<HTMLElement>('.code');
-        const code = codeElement?.dataset?.code || codeElement?.textContent?.trim();
-        const description = card.querySelector('h3')?.textContent?.trim() || '';
-        const verified = Boolean(card.querySelector('.insights')?.textContent?.includes('Verified'));
-        const discountMatch = description.match(/(\d+)%/);
-        const discount = discountMatch ? parseInt(discountMatch[1]) : 0;
-
-        return {
-          code,
-          description,
-          verified,
-          discount
-        };
-      });
-    });
-
-    // Filter valid offers and sort by verification status and discount amount
-    const validOffers = offers
-      .filter(offer => offer.code && offer.discount > 0)
-      .sort((a, b) => {
-        if (a.verified !== b.verified) return b.verified ? 1 : -1;
-        return b.discount - a.discount;
-      });
-
-    const bestOffer = validOffers[0];
-    if (bestOffer?.code) {
-      return {
-        code: bestOffer.code,
-        description: bestOffer.description,
-        source: 'couponfollow.com',
-        isVerified: bestOffer.verified,
-        discountPercent: bestOffer.discount
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error scraping CouponFollow:', error);
     return null;
   } finally {
     await page.close();
@@ -249,18 +192,8 @@ async function scrapeCoupons(storeUrl: string): Promise<ExtractedCouponData[]> {
     console.log('Starting coupon scrape for URL:', storeUrl);
     browser = await initializeBrowser();
     
-    // Try both sources and collect valid coupons
-    const [couponsComCode, couponFollowCode] = await Promise.all([
-      scrapeCouponsDotCom(storeUrl, browser),
-      scrapeCouponFollow(storeUrl, browser)
-    ]);
-
-    const validCoupons = [couponsComCode, couponFollowCode]
-      .filter((code): code is ExtractedCouponData => Boolean(code))
-      .sort((a, b) => {
-        if (a.isVerified !== b.isVerified) return b.isVerified ? 1 : -1;
-        return b.discountPercent - a.discountPercent;
-      });
+    const couponsComCode = await scrapeCouponsDotCom(storeUrl, browser);
+    const validCoupons = couponsComCode ? [couponsComCode] : [];
 
     console.log(`Successfully collected ${validCoupons.length} coupons:`, validCoupons);
     return validCoupons;
