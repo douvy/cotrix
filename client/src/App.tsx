@@ -91,7 +91,7 @@ function App() {
       <main className="flex-grow px-4 py-6 sm:px-8 lg:px-16 sm:py-8">
         <section className="mb-6 sm:mb-8 text-center">
           <h3 className="text-xl sm:text-2xl text-[#999] tracking-wider px-2">
-            Enter a store URL to get the top coupon code
+            Enter a store URL to get the top coupon code(s)
           </h3>
         </section>
 
@@ -126,13 +126,13 @@ function App() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="mt-4 text-[#999] animate-pulse">Searching for coupon codes...</p>
+              <p className="mt-4 text-[#999] animate-pulse">Searching for coupon code(s)...</p>
             </div>
           )}
 
           {!loading && codes.length > 0 && (
             <div className="mt-6 sm:mt-8">
-              <h2 className="text-lg mb-4 tracking-wider">Best coupon code found</h2>
+              <h2 className="text-lg mb-4 tracking-wider">Best coupon code(s) found</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                 {codes.map((code, idx) => (
                   <button

@@ -7,10 +7,13 @@ import * as puppeteer from 'puppeteer';
 // Type can be either browser type since they share the same interface
 type Browser = puppeteer.Browser | puppeteerCore.Browser;
 
-interface CouponData {
+interface ExtractedCouponData {
   code: string;
   description: string;
   expiry?: string;
+  source: 'coupons.com' | 'couponfollow.com';
+  isVerified: boolean;
+  discountPercent: number;
 }
 
 async function initializeBrowser(): Promise<puppeteer.Browser> {
@@ -34,17 +37,13 @@ async function initializeBrowser(): Promise<puppeteer.Browser> {
 
 async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Page> {
   try {
-    console.log('Creating new page');
     const page = await browser.newPage();
-    console.log('Page created successfully');
     
     page.on('console', msg => console.log('Browser console:', msg.text()));
     page.on('error', err => console.error('Page error:', err));
     page.on('pageerror', err => console.error('Page error:', err));
     
-    console.log('Setting request interception');
     await page.setRequestInterception(true);
-    
     page.on('request', (request) => {
       try {
         if (['image', 'font', 'stylesheet'].includes(request.resourceType())) {
@@ -58,9 +57,7 @@ async function initializePage(browser: puppeteer.Browser): Promise<puppeteer.Pag
       }
     });
 
-    console.log('Setting user agent');
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
     return page;
   } catch (error) {
     console.error('Error initializing page:', error);
@@ -87,35 +84,33 @@ async function extractCodeFromPopup(page: puppeteer.Page): Promise<string | null
   }
 }
 
-async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHandle, browser: puppeteer.Browser): Promise<CouponData | null> {
+async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHandle<Element>, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
   try {
-    const description = await card.$eval('h3', (element: Element) => element.textContent || '').catch(() => 'Unknown description');
-    const cardHtml = await card.evaluate((el: Element) => el.outerHTML);
-    console.log(`Card HTML: ${cardHtml.substring(0, 200)}...`);
+    const cardData = await card.evaluate((el: Element) => {
+      const description = el.querySelector('h3')?.textContent || 'Unknown description';
+      const insights = el.querySelector('[data-element="voucher-card-labels"] div')?.textContent || '';
+      const isCouponCode = insights.includes('Code');
+      
+      return {
+        description,
+        isCouponCode,
+        html: el.outerHTML
+      };
+    });
 
-    const isCouponCode = await card.$eval(
-      '[data-element="voucher-card-labels"] div',
-      (element: Element) => element.textContent?.includes('Code') || false
-    ).catch(() => false);
-
-    console.log(`Card "${description}" - isCouponCode: ${isCouponCode}`);
-    if (!isCouponCode) {
-      console.log(`Card "${description}" is not a coupon code, skipping`);
+    if (!cardData.isCouponCode) {
       return null;
     }
 
     const seeButton = await card.$('div[title="See coupon"]');
     if (!seeButton) {
-      console.log(`No "See coupon" button found for "${description}", skipping`);
       return null;
     }
 
     const newPagePromise = new Promise<puppeteer.Page>(resolve => {
-      browser.on('targetcreated', async (target) => {
-        if (target.type() === 'page') {
-          const newPage = await target.page();
-          if (newPage) resolve(newPage);
-        }
+      browser.once('targetcreated', async (target) => {
+        const newPage = await target.page();
+        if (newPage) resolve(newPage);
       });
     });
 
@@ -124,86 +119,151 @@ async function handleVoucherCard(page: puppeteer.Page, card: puppeteer.ElementHa
     await popupPage.bringToFront();
 
     const code = await extractCodeFromPopup(popupPage);
+    await popupPage.close();
+
     if (!code) {
-      await popupPage.close();
       return null;
     }
 
-    const expiry = await card.$eval('span:contains("Expires")', (element: Element) => element.textContent)
-      .then((textContent: string | null) => textContent?.replace('Expires:', '').trim())
-      .catch(() => undefined);
+    const discountMatch = cardData.description.match(/(\d+)%/);
+    const discountPercent = discountMatch ? parseInt(discountMatch[1]) : 0;
+    const isVerified = cardData.description.toLowerCase().includes('verified');
 
-    await popupPage.close();
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    console.log(`Successfully extracted code "${code}" for "${description}"`);
-    return { code, description, expiry };
+    return {
+      code,
+      description: cardData.description,
+      source: 'coupons.com',
+      isVerified,
+      discountPercent
+    };
   } catch (error) {
     console.error('Error processing voucher card:', error);
     return null;
   }
 }
 
-async function scrapeCoupons(storeUrl: string): Promise<CouponData[]> {
-  let browser;
+async function scrapeCouponsDotCom(storeUrl: string, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
+  const page = await initializePage(browser);
   try {
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('Starting browser initialization for URL:', storeUrl);
-    
-    browser = await initializeBrowser();
-    const page = await initializePage(browser);
-    
-    console.log('Parsing store name from URL:', storeUrl);
-    const storeName = new URL(storeUrl).hostname.replace('www.', '').split('.')[0].toLowerCase().replace(/(clothing|shop|store|online)/g, '');
+    const storeName = new URL(storeUrl).hostname
+      .replace('www.', '')
+      .split('.')[0]
+      .toLowerCase()
+      .replace(/(clothing|shop|store|online)/g, '');
     const couponsUrl = `https://www.coupons.com/coupon-codes/${storeName}`;
-    console.log(`Navigating to ${couponsUrl}`);
     
-    await page.goto(couponsUrl, { 
-      waitUntil: 'domcontentloaded', // Changed from networkidle0 for faster loading
-      timeout: 15000 
-    });
+    await page.goto(couponsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     try {
-      console.log('Waiting for voucher cards...');
       await page.waitForSelector('[data-testid="vouchers-ui-voucher-card"]', { timeout: 10000 });
-      console.log('Voucher cards found');
+
+      const cardElements = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
+      if (!cardElements || cardElements.length === 0) {
+        console.log('No voucher cards found on Coupons.com');
+        return null;
+      }
+      
+      console.log(`Found ${cardElements.length} voucher cards on Coupons.com`);
+
+      for (let i = 0; i < cardElements.length; i++) {
+        const couponData = await handleVoucherCard(page, cardElements[i], browser);
+        if (couponData) return couponData;
+      }
+
+      return null;
     } catch (error) {
-      console.log('No voucher cards found, trying fallback method');
-      const fallbackCodes = await page.$$eval('h3, span, div', elements =>
-        elements
-          .map(el => el.textContent?.trim())
-          .filter(text => text && /^[A-Z0-9-]{4,15}$/.test(text))
-          .map(text => ({ code: text as string, description: 'Fallback code', expiry: undefined }))
-      );
-      
-      if (fallbackCodes.length > 0) {
-        console.log('Found fallback codes:', fallbackCodes);
-        return fallbackCodes.slice(0, 1);  // Changed to only return 1 code
-      }
-      
-      console.error('No codes found with fallback method');
-      return [];
+      console.log('No valid voucher cards found on Coupons.com');
+      return null;
     }
 
-    const cards = await page.$$('[data-testid="vouchers-ui-voucher-card"]');
-    console.log(`Found ${cards.length} voucher cards`);
+  } catch (error) {
+    console.error('Error scraping Coupons.com:', error);
+    return null;
+  } finally {
+    await page.close();
+  }
+}
+
+async function scrapeCouponFollow(storeUrl: string, browser: puppeteer.Browser): Promise<ExtractedCouponData | null> {
+  const page = await initializePage(browser);
+  try {
+    const storeName = new URL(storeUrl).hostname.replace('www.', '').split('.')[0];
+    const url = `https://couponfollow.com/site/${storeName}.com`;
     
-    const coupons: CouponData[] = [];
-    for (const card of cards.slice(0, 1)) {  // Changed to only process 1 card
-      try {
-        const couponData = await handleVoucherCard(page, card, browser);
-        if (couponData && couponData.code) {
-          coupons.push(couponData);
-        }
-        if (coupons.length >= 1) break;  // Break after first successful code
-      } catch (error) {
-        console.error('Error processing individual card:', error);
-        continue;
-      }
+    console.log(`Navigating to ${url}`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    // Wait for offers to load
+    await page.waitForSelector('.offer-card.regular-offer', { timeout: 10000 });
+    
+    const offers = await page.evaluate(() => {
+      const cards = Array.from(document.querySelectorAll<HTMLElement>('.offer-card.regular-offer'));
+      return cards.map(card => {
+        const codeElement = card.querySelector<HTMLElement>('.code');
+        const code = codeElement?.dataset?.code || codeElement?.textContent?.trim();
+        const description = card.querySelector('h3')?.textContent?.trim() || '';
+        const verified = Boolean(card.querySelector('.insights')?.textContent?.includes('Verified'));
+        const discountMatch = description.match(/(\d+)%/);
+        const discount = discountMatch ? parseInt(discountMatch[1]) : 0;
+
+        return {
+          code,
+          description,
+          verified,
+          discount
+        };
+      });
+    });
+
+    // Filter valid offers and sort by verification status and discount amount
+    const validOffers = offers
+      .filter(offer => offer.code && offer.discount > 0)
+      .sort((a, b) => {
+        if (a.verified !== b.verified) return b.verified ? 1 : -1;
+        return b.discount - a.discount;
+      });
+
+    const bestOffer = validOffers[0];
+    if (bestOffer?.code) {
+      return {
+        code: bestOffer.code,
+        description: bestOffer.description,
+        source: 'couponfollow.com',
+        isVerified: bestOffer.verified,
+        discountPercent: bestOffer.discount
+      };
     }
 
-    console.log(`Successfully collected ${coupons.length} coupons`);
-    return coupons;
+    return null;
+  } catch (error) {
+    console.error('Error scraping CouponFollow:', error);
+    return null;
+  } finally {
+    await page.close();
+  }
+}
+
+async function scrapeCoupons(storeUrl: string): Promise<ExtractedCouponData[]> {
+  let browser;
+  try {
+    console.log('Starting coupon scrape for URL:', storeUrl);
+    browser = await initializeBrowser();
+    
+    // Try both sources and collect valid coupons
+    const [couponsComCode, couponFollowCode] = await Promise.all([
+      scrapeCouponsDotCom(storeUrl, browser),
+      scrapeCouponFollow(storeUrl, browser)
+    ]);
+
+    const validCoupons = [couponsComCode, couponFollowCode]
+      .filter((code): code is ExtractedCouponData => Boolean(code))
+      .sort((a, b) => {
+        if (a.isVerified !== b.isVerified) return b.isVerified ? 1 : -1;
+        return b.discountPercent - a.discountPercent;
+      });
+
+    console.log(`Successfully collected ${validCoupons.length} coupons:`, validCoupons);
+    return validCoupons;
   } catch (error) {
     console.error('Fatal scraping error:', error);
     return [];
@@ -232,14 +292,13 @@ app.post('/api/coupons', async (req: express.Request, res: express.Response) => 
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
   try {
-    console.log('Starting coupon scrape for URL:', url);
     const coupons = await scrapeCoupons(url);
-    console.log('Scrape completed, coupons found:', coupons);
     
     if (coupons.length === 0) {
       console.log('No valid coupon codes found, returning empty array');
       return res.json([]);
     }
+
     const codes = coupons.map(coupon => coupon.code);
     console.log('Returning codes to client:', codes);
     res.json(codes);
